@@ -8,18 +8,12 @@ HOST   = 'sc14.supercomputing.org'
 OUTPUT = 'sc14.vcs'
 LIST   = 'list'
 VCSDIR = 'vcs'
+CONVERT_LF_TO_SPACE = true
+OMIT_NO_SUMMARY = true
 
 # Customize Event Selection
-#EVENT_SELECTION = []
-EVENT_SELECTION = %w[
- bof
- gb
- mswk
- inspkr
- pap
- post
- wksp
-]
+EVENT_SELECTION = []
+#EVENT_SELECTION = %w[ bof gb mswk inspkr pap post wksp ]
 
 # ---- Abbreviation list ----
 # bespkr : HPC Interconnections, Broader Engagement
@@ -137,9 +131,16 @@ def read_vevent(fname)
         prt = false
       else
         if prt
-          if /^SUMMARY:(.*)$/ =~ line
+          case line
+          when /^SUMMARY:(.*)$/
             if !$1.strip.empty?
               found_summary = true
+              a << line
+            end
+          when /^\w+;ENCODING=QUOTED-PRINTABLE:/
+            if CONVERT_LF_TO_SPACE
+              a << line.gsub(/=0A/," ")
+            else
               a << line
             end
           else
@@ -148,8 +149,13 @@ def read_vevent(fname)
         end
       end
     end
+
     if !found_summary
-      a << "SUMMARY:evid="+File.basename(fname,".vcs")
+      if OMIT_NO_SUMMARY
+        return ""
+      else
+        a << "SUMMARY:evid="+File.basename(fname,".vcs")
+      end
     end
     "BEGIN:VEVENT\n"+a.join("\n")+"\nEND:VEVENT\n"
   end
