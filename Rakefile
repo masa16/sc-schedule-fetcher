@@ -10,6 +10,7 @@ LIST   = 'list'
 VCSDIR = 'vcs'
 
 # Customize Event Selection
+#EVENT_SELECTION = []
 EVENT_SELECTION = %w[
  bof
  gb
@@ -91,15 +92,22 @@ task :default => OUTPUT
 
 ## Concatinate VCS
 file OUTPUT => VCSLIST do
+  print "writing VCS to '#{OUTPUT}'..."
   buf = <<EOL
 BEGIN:VCALENDAR
 PRODID:-//Microsoft Corporation//Outlook MIMEDIR//EN
 VERSION:1.0
 EOL
   #
-  EVENT_SELECTION.each do |sel|
-    Dir.glob("vcs/#{sel}*.vcs").each do |fname|
+  if EVENT_SELECTION.empty?
+    Dir.glob("vcs/*.vcs").each do |fname|
       buf << read_vevent(fname)
+    end
+  else
+    EVENT_SELECTION.each do |sel|
+      Dir.glob("vcs/#{sel}*.vcs").each do |fname|
+        buf << read_vevent(fname)
+      end
     end
   end
   #
@@ -112,6 +120,7 @@ EOL
       f.print line.chomp+"\n"
     end
   end
+  puts "done"
 end
 
 def read_vevent(fname)
@@ -145,26 +154,3 @@ def read_vevent(fname)
     "BEGIN:VEVENT\n"+a.join("\n")+"\nEND:VEVENT\n"
   end
 end
-
-# Copyright (c) 2014 Masahiro TANAKA
-#
-# MIT License
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
-#
-# The above copyright notice and this permission notice shall be
-# included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

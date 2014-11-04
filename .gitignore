@@ -1,3 +1,7 @@
+/vcs/
+list
+*.vcs
+
 *.gem
 *.rbc
 /.config
