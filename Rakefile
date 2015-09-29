@@ -1,19 +1,20 @@
-# Rakefile to fetch SC14 schecule
+# Rakefile to fetch SC15 schecule
 # Written by Masahiro Tanaka
 
 require 'net/http'
 require 'uri'
+require 'rake/clean'
 
-HOST   = 'sc14.supercomputing.org'
-OUTPUT = 'sc14.vcs'
+HOST   = 'sc15.supercomputing.org'
+OUTPUT = 'sc15.vcs'
 LIST   = 'list'
 VCSDIR = 'vcs'
 CONVERT_LF_TO_SPACE = true
 OMIT_NO_SUMMARY = true
 
 # Customize Event Selection
-EVENT_SELECTION = []
-#EVENT_SELECTION = %w[ bof gb mswk inspkr pap post wksp ]
+#EVENT_SELECTION = []
+EVENT_SELECTION = %w[ bof gb mswk inspkr pap post wksp ]
 
 # ---- Abbreviation list ----
 # bespkr : HPC Interconnections, Broader Engagement
@@ -38,9 +39,11 @@ EVENT_SELECTION = []
 # wksp : workshop
 # ----------------
 
+CLEAN.include(VCSDIR,LIST,OUTPUT)
+
 ## Obtain Event IDs
 file LIST do
-  print "fetching SC14 schedule..."
+  print "fetching schedule from #{HOST}..."
   body = Net::HTTP.get(HOST,"/schedule")
   puts "done"
 
