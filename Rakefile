@@ -1,127 +1,133 @@
-# Rakefile to fetch SC15 schecule
+# Rakefile to fetch SC16 schecule
 # Written by Masahiro Tanaka
 
 require 'net/http'
 require 'uri'
 require 'rake/clean'
 
-HOST   = 'sc15.supercomputing.org'
-OUTPUT = 'sc15.vcs'
-LIST   = 'list'
-VCSDIR = 'vcs'
+HOST   = 'sc16.supercomputing.org'
+PROG   = 'full-program.html'
+OUTPUT = 'sc16.ics'
+IDLIST = 'id_list'
+ICSDIR = 'ics'
 CONVERT_LF_TO_SPACE = true
 OMIT_NO_SUMMARY = true
 
 # Customize Event Selection
 #EVENT_SELECTION = []
-EVENT_SELECTION = %w[ bof gb mswk inspkr pap post wksp ]
+EVENT_SELECTION = %w[ bof gb inspkr inv pap pec post wksp ]
 
 # ---- Abbreviation list ----
-# bespkr : HPC Interconnections, Broader Engagement
+# #bespkr : HPC Interconnections, Broader Engagement
 # bof : BoF
 # drs : Doctoral Showcase - Dissertation Research Showcase
 # emt : Emerging Technologies
-# eps : HPC Interconnections, HPC Educator Program
-# ers : Doctoral Showcase - Early Research Showcases
+# #eps : HPC Interconnections, HPC Educator Program
+# #ers : Doctoral Showcase - Early Research Showcases
 # exforum : Exhibitor Forums
 # gb : ACM Gordon Bell Finalists
+# hpcmat : HPC Matters
 # imp : HPC Impact Showcases
-# inspkr : Keynotes & Plenary Talks
-# mswk : Invited Speakers
-# nre : Network Research Exhibitions
+# inspkr : Keynotes
+# inv : Invited Speakers
+# #mswk : Invited Speakers
+# #nre : Network Research Exhibitions
 # pan : Panels
 # pap : paper
 # pec : others
 # post : poster
+# sess : Break, Lunch
 # spost : ACM Student Research Competition Posters
 # svs : Scientific Visualization Showcases
 # tut : tutorial
 # wksp : workshop
 # ----------------
 
-CLEAN.include(VCSDIR,LIST,OUTPUT)
+CLEAN.include(IDLIST,PROG,ICSDIR,OUTPUT)
 
 ## Obtain Event IDs
-file LIST do
-  print "fetching schedule from #{HOST}..."
-  body = Net::HTTP.get(HOST,"/schedule")
+file PROG do
+  base = File.basename(PROG,'.html')
+  print "fetching #{PROG} from #{HOST}..."
+  body = Net::HTTP.get(HOST,"/#{base}/")
+  File.open(PROG,"w"){|f| f.write body}
   puts "done"
-
-  evlist = []
-  body.each_line do |line|
-    if /vcs\.php\?evid=(\w+)'/ =~ line
-      evlist << $1
-    end
-  end
-
-  print "writing event id list to '#{LIST}'..."
-  File.open(LIST,"w") do |f|
-    evlist.sort.uniq.each do |id|
-      f.puts id
-    end
-  end
-  puts "done"
-end.invoke
-
-FileUtils.mkdir_p(VCSDIR)
-
-VCSLIST = []
-open(LIST) do |f|
-  f.each do |x|
-    if EVENT_SELECTION.empty? ||
-        EVENT_SELECTION.any?{|sel| /#{sel}.*/ =~ x}
-      VCSLIST << "#{VCSDIR}/#{x.chomp}.vcs"
-    end
-  end
 end
 
-## Fetch VCS
-rule ".vcs" do |t|
+file IDLIST => PROG do
+  evlist = []
+  File.open(PROG,"r").read.scan(/get_cal\.php\?id=(\w+)/){|a| evlist << a}
+  print "writing event id list to '#{IDLIST}'..."
+  File.open(IDLIST,"w") do |f|
+    evlist.sort.uniq.each{|id| f.puts id}
+  end
+  puts "done"
+end
+
+directory ICSDIR
+
+### Concatinate ICS
+file OUTPUT => [IDLIST,ICSDIR] do |t|
+  ICSLIST = []
+  open(IDLIST) do |f|
+    f.each do |x|
+      if EVENT_SELECTION.empty? || EVENT_SELECTION.any?{|sel| /#{sel}.*/ =~ x}
+        ICSLIST << "#{ICSDIR}/#{x.chomp}.ics"
+      end
+    end
+  end
+  #
+  task(:get_ics => ICSLIST).invoke
+  #
+  a1,a3 = read_envelope(ICSLIST.first)
+  buf = a1.join("\n")
+  ICSLIST.each{|fname| buf << read_vevent(fname)}
+  buf << a3.join("\n")
+  #
+  print "writing ICS to '#{OUTPUT}'..."
+  File.open(OUTPUT,"w") do |f|
+    buf.each_line{|line| f.print line.chomp+"\n"}
+  end
+  puts "done"
+end
+
+## Fetch ICS
+rule ".ics" do |t|
   print "fetching #{t.name}..."
-  evid = File.basename(t.name,".vcs")
-  uri = URI.parse("http://#{HOST}/schedule-data/vcs.php?evid=#{evid}")
+  evid = File.basename(t.name,".ics")
+  uri = URI.parse("http://sc16.supercomputing.org/wp-content/plugins/linklings_wp_program/get_cal.php?id=#{evid}")
   body = Net::HTTP.get(uri)
   File.open(t.name,"w"){|f| f.write(body)}
   puts "done"
 end
 
+## target
 task :default => OUTPUT
 
-## Concatinate VCS
-file OUTPUT => VCSLIST do
-  print "writing VCS to '#{OUTPUT}'..."
-  buf = <<EOL
-BEGIN:VCALENDAR
-PRODID:-//Microsoft Corporation//Outlook MIMEDIR//EN
-VERSION:1.0
-EOL
-  #
-  if EVENT_SELECTION.empty?
-    Dir.glob("vcs/*.vcs").each do |fname|
-      buf << read_vevent(fname)
-    end
-  else
-    EVENT_SELECTION.each do |sel|
-      Dir.glob("vcs/#{sel}*.vcs").each do |fname|
-        buf << read_vevent(fname)
+## read ics envelope
+def read_envelope(fname)
+  a1 = a = []
+  a2 = []
+  a3 = []
+  File.open(fname,encoding:"ISO-8859-1") do |f|
+    f.each_line do |line|
+      line.chomp!
+      case line
+      when /^BEGIN:VEVENT/
+        a = a2
+      when /^END:VEVENT/
+        a = a3
+      else
+        a << line
       end
     end
   end
-  #
-  buf << <<EOL
-END:VCALENDAR
-EOL
-  #
-  File.open(OUTPUT,"w") do |f|
-    buf.each_line do |line|
-      f.print line.chomp+"\n"
-    end
-  end
-  puts "done"
+  [a1,a3]
 end
 
+## read ics body
 def read_vevent(fname)
-  open(fname) do |f|
+  File.open(fname,encoding:"ISO-8859-1") do |f|
     prt = false
     a = []
     found_summary = false
@@ -141,11 +147,7 @@ def read_vevent(fname)
               a << line
             end
           when /^\w+;ENCODING=QUOTED-PRINTABLE:/
-            if CONVERT_LF_TO_SPACE
-              a << line.gsub(/=0A/," ")
-            else
-              a << line
-            end
+            a << CONVERT_LF_TO_SPACE ? line.gsub(/=0A/," ") : line
           else
             a << line
           end
@@ -157,7 +159,7 @@ def read_vevent(fname)
       if OMIT_NO_SUMMARY
         return ""
       else
-        a << "SUMMARY:evid="+File.basename(fname,".vcs")
+        a << "SUMMARY:evid="+File.basename(fname,".ics")
       end
     end
     "BEGIN:VEVENT\n"+a.join("\n")+"\nEND:VEVENT\n"
