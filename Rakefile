@@ -1,13 +1,13 @@
-# Rakefile to fetch SC16 schecule
+# Rakefile to fetch SC17 schecule
 # Written by Masahiro Tanaka
 
 require 'net/http'
 require 'uri'
 require 'rake/clean'
 
-HOST   = 'sc16.supercomputing.org'
+HOST   = 'sc17.supercomputing.org'
 PROG   = 'full-program.html'
-OUTPUT = 'sc16.ics'
+OUTPUT = 'sc17.ics'
 IDLIST = 'id_list'
 ICSDIR = 'ics'
 CONVERT_LF_TO_SPACE = true
@@ -47,11 +47,13 @@ CLEAN.include(IDLIST,PROG,ICSDIR,OUTPUT)
 
 ## Obtain Event IDs
 file PROG do
-  base = File.basename(PROG,'.html')
-  print "fetching #{PROG} from #{HOST}..."
-  body = Net::HTTP.get(HOST,"/#{base}/")
-  File.open(PROG,"w"){|f| f.write body}
-  puts "done"
+  (12..17).each do |i|
+    path = '/wp-content/linklings_snippets/wp_program_view_all_2017-11-%02d.txt'%i
+    print "fetching #{HOST}#{path} ..."
+    body = Net::HTTP.get(HOST, path)
+    File.open(PROG,"a"){|f| f.write body}
+    puts "done"
+  end
 end
 
 file IDLIST => PROG do
@@ -80,7 +82,7 @@ file OUTPUT => [IDLIST,ICSDIR] do |t|
   task(:get_ics => ICSLIST).invoke
   #
   a1,a3 = read_envelope(ICSLIST.first)
-  buf = a1.join("\n")
+  buf = a1.join("\n")+"\n"
   ICSLIST.each{|fname| buf << read_vevent(fname)}
   buf << a3.join("\n")
   #
@@ -95,7 +97,7 @@ end
 rule ".ics" do |t|
   print "fetching #{t.name}..."
   evid = File.basename(t.name,".ics")
-  uri = URI.parse("http://sc16.supercomputing.org/wp-content/plugins/linklings_wp_program/get_cal.php?id=#{evid}")
+  uri = URI.parse("http://sc17.supercomputing.org/wp-content/plugins/linklings_wp_program/get_cal.php?id=#{evid}")
   body = Net::HTTP.get(uri)
   File.open(t.name,"w"){|f| f.write(body)}
   puts "done"
@@ -113,9 +115,9 @@ def read_envelope(fname)
     f.each_line do |line|
       line.chomp!
       case line
-      when /^BEGIN:VEVENT/
+      when /^BEGIN:VEVENT$/
         a = a2
-      when /^END:VEVENT/
+      when /^END:VEVENT$/
         a = a3
       else
         a << line
@@ -134,9 +136,9 @@ def read_vevent(fname)
     f.each_line do |line|
       line.chomp!
       case line
-      when /^BEGIN:VEVENT/
+      when /^BEGIN:VEVENT$/
         prt = true
-      when /^END:VEVENT/
+      when /^END:VEVENT$/
         prt = false
       else
         if prt
