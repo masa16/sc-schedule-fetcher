@@ -14,4 +14,4 @@ Tool to fetch SC schedule data in the iCalendar form.
 
         $ rake
 
-* Then you will find file 'sc16.ics'.
+* Then you will find file 'sc17.ics'.
