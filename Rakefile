@@ -1,13 +1,14 @@
-# Rakefile to fetch SC17 schecule
+# Rakefile to fetch SC18 schecule
 # Written by Masahiro Tanaka
 
 require 'net/http'
 require 'uri'
 require 'rake/clean'
 
-HOST   = 'sc17.supercomputing.org'
+HOST   = 'sc18.supercomputing.org'
+OUTPUT = 'sc18.ics'
+DAYS   = '2018-11-11'..'2018-11-17'
 PROG   = 'full-program.html'
-OUTPUT = 'sc17.ics'
 IDLIST = 'id_list'
 ICSDIR = 'ics'
 CONVERT_LF_TO_SPACE = true
@@ -15,7 +16,7 @@ OMIT_NO_SUMMARY = true
 
 # Customize Event Selection
 #EVENT_SELECTION = []
-EVENT_SELECTION = %w[ bof gb inspkr inv pap pec post wksp ]
+EVENT_SELECTION = %w[ bof gb inspkr inv pap post ^sess...$ ]
 
 # ---- Abbreviation list ----
 # #bespkr : HPC Interconnections, Broader Engagement
@@ -41,14 +42,15 @@ EVENT_SELECTION = %w[ bof gb inspkr inv pap pec post wksp ]
 # svs : Scientific Visualization Showcases
 # tut : tutorial
 # wksp : workshop
+# ws_ : workshop presentaions
 # ----------------
 
 CLEAN.include(IDLIST,PROG,ICSDIR,OUTPUT)
 
 ## Obtain Event IDs
 file PROG do
-  (12..17).each do |i|
-    path = '/wp-content/linklings_snippets/wp_program_view_all_2017-11-%02d.txt'%i
+  DAYS.each do |i|
+    path = "/app/linklings_snippets/wp_program_view_all_#{i}.txt"
     print "fetching #{HOST}#{path} ..."
     body = Net::HTTP.get(HOST, path)
     File.open(PROG,"a"){|f| f.write body}
@@ -58,7 +60,7 @@ end
 
 file IDLIST => PROG do
   evlist = []
-  File.open(PROG,"r").read.scan(/get_cal\.php\?id=(\w+)/){|a| evlist << a}
+  File.open(PROG,"r").read.scan(/get_cal\.php\?id=([^"']+)/){|a| evlist << a}
   print "writing event id list to '#{IDLIST}'..."
   File.open(IDLIST,"w") do |f|
     evlist.sort.uniq.each{|id| f.puts id}
@@ -73,7 +75,7 @@ file OUTPUT => [IDLIST,ICSDIR] do |t|
   ICSLIST = []
   open(IDLIST) do |f|
     f.each do |x|
-      if EVENT_SELECTION.empty? || EVENT_SELECTION.any?{|sel| /#{sel}.*/ =~ x}
+      if EVENT_SELECTION.empty? || EVENT_SELECTION.any?{|sel| /#{sel}/ =~ x}
         ICSLIST << "#{ICSDIR}/#{x.chomp}.ics"
       end
     end
@@ -97,7 +99,7 @@ end
 rule ".ics" do |t|
   print "fetching #{t.name}..."
   evid = File.basename(t.name,".ics")
-  uri = URI.parse("http://sc17.supercomputing.org/wp-content/plugins/linklings_wp_program/get_cal.php?id=#{evid}")
+  uri = URI.parse("http://#{HOST}/app/plugins/linklings_wp_program/get_cal.php?id=#{evid}")
   body = Net::HTTP.get(uri)
   File.open(t.name,"w"){|f| f.write(body)}
   puts "done"
